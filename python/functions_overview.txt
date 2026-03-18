@@ -1,0 +1,257 @@
+MATLAB FUNCTIONS (from m_BlaSea.m and related helpers)
+======================================================
+
+GetPgr3
+- Returns plotting/geometry parameters: axis grids (ceXY, ceGI), vertical/horizontal grid sizes (grV, grH), viewing angles (AZI, ELE), number of points, default colormap (clr), and font size (fs). Used to configure figure appearance and 3D surface views.
+
+m_BlaSea
+- Main script/function for the "Black sea vortex in Image" experiment.
+- Loads two images of the Black Sea (BlSa0.bmp and BlSa1.bmp), extracts a single color channel from each (a and A), and displays them.
+- Builds a discrete polar grid and various derivative/gradient operators using BaFuHa / BFH and CPOLYe.
+- Computes a gradient-like field G from image A (cgraFIe), its magnitude (absV2e), and localized gradients g around a chosen center point using ouPCTe.
+- Uses snPfIe to measure how well the local gradient field matches the designed polar pattern diP, over a moving window, producing a similarity map maD.
+- Embeds maD back into an image-sized canvas (inPCT) and visualizes it on the original geometry with FSurPCT.
+- Contains an inner helper function forIIFAR that inspects the basis H and its derivative DH (from BFH) and illustrates their interactions via small test matrices.
+
+Fig
+- Creates a new MATLAB figure window with a given title text and a light gray background. Used as a helper to standardize figure appearance before plotting images or surfaces.
+
+Fimage
+- High-level "show image in a figure" helper.
+- Calls Fig to open/titled a figure, then displays an image matrix using image(TC).
+- Adjusts axes based on TiDi: TiDi0 hides tick colors to blend with background, TiDi2 sets ticks at corners and leaves axis visible.
+
+FimP
+- Simple image-display utility for matrices X.
+- If X is nontrivial, opens a Fig with the given title, then calls imP to render X according to TiDi (zoom, grayscale/colormap, etc.).
+
+TiDi0
+- Axis styling helper: uses current figure/axes and sets tick direction to "out".
+- Sets axis colors equal to figure background so ticks and borders visually disappear; used when the image itself should be the only visible content.
+
+TiDi2
+- Axis styling helper for images/surfaces where axes should be visible.
+- Reads image size (height/width), sets x- and y-ticks at the corners, and redraws, giving a "framed" image with clear coordinate axes.
+
+RGBf
+- Splits an RGB image into its R, G, and B channel matrices.
+- Used throughout to work with individual color channels and to build custom color transforms.
+
+PTC
+- "Pack to color" helper: takes R, G, B channels and returns a color image matrix suitable for display with image().
+- Provides a consistent way to go from separate channels back to a visualization.
+
+BaFuHa / BFH
+- Construct discrete basis/filter matrices (H) and their derivatives (DH) on a 1D grid.
+- Used to analyze structure of the image and to define custom finite-difference/orthogonal bases for gradients and higher-order operations.
+
+CPOLYe
+- Builds a discrete polar pattern (diP) over a circular domain based on index, number of points, probabilities, width, and other parameters.
+- The resulting matrix describes an idealized vortex / circulation pattern used for comparison to real gradients.
+
+cgraFIe
+- Computes a gradient-like complex field G from image A using the basis H and its derivative DH.
+- Returns both G (complex gradient field) and pA (an associated magnitude or phase map used for visualization).
+
+absV2e
+- Takes a complex 2D field (e.g. gradients) and returns its magnitude as a real-valued matrix.
+- Used for visualizing gradient strength (abs(Grad), abs(grad), etc.).
+
+ouPCT / ouPCTe
+- Extracts a windowed patch from a larger matrix (image or gradient field) centered at (I0, J0) with size determined by n.
+- ouPCT operates on scalar-valued images; ouPCTe operates on complex/gradient fields.
+
+snPfIe
+- Computes a scalar similarity/score between the designed polar pattern diP and a local gradient field g.
+- Used with an option flag (1 or 0) to either report a global score or fill a map (maD) across many positions.
+
+FSurPCT
+- Visualizes a matrix (such as maD) as a 3D surface over coordinates derived from ceXY and viewing angles AZI/ELE.
+- Used to see where the similarity between the real gradient field and the polar pattern is strongest over the image domain.
+
+updn2e
+- Resizes or normalizes 2D matrices (e.g., gradients or patterns) to a standard resolution.
+- Ensures derived fields fit the expected grid size before being passed to QUIVERe or other visualization tools.
+
+QUIVERe
+- Draws vector fields (quiver plots) for gradient/flow-like matrices (e.g., G, g, or diP).
+- Used many times in the scripts to visualize direction and magnitude of flows or gradients over the image.
+
+inPCT
+- Embeds a smaller matrix (like maD) into a larger canvas at a specified center (I0, J0).
+- Produces an image-sized field where only a region around the center is filled with analysis results.
+
+
+PYTHON CODE (python/main.py)
+=============================
+
+find_image_files(base_dir: Path) -> list[Path]
+- Scans a given directory (non-recursively) and returns a sorted list of image files with extensions bmp, png, jpg, jpeg, gif.
+- Used to populate the list of available images in the UI.
+
+class ImageViewer(tk.Tk)
+- Main Tkinter application window that mirrors part of the MATLAB Black Sea interface.
+- Responsibilities:
+  - Build the layout: left panel with image list and buttons, right panel with a matplotlib axes to display images with graph axes.
+  - Maintain state: project base directory and list of image files.
+  - Provide actions:
+    - show_selected: display the image currently selected in the listbox.
+    - show_black_sea_a: quick-load and display BlSa0.bmp (the "a" image from the Black Sea example).
+    - show_black_sea_A: quick-load and display BlSa1.bmp (the "A" image from the Black Sea example).
+    - _show_image_from_path: robust helper that opens an image by path and routes it to the renderer.
+    - _show_image_with_axes: render an image via matplotlib with visible axes and ticks, roughly analogous to MATLAB’s image + axis settings (similar to Fimage/TiDi2).
+
+main()
+- Entry point for the Python app.
+- Computes the project base directory (parent of the python folder), instantiates ImageViewer with it, and starts the Tkinter event loop.
+
+
+PYTHON CODE (Black Sea – step 1: python/black_sea_step1.py)
+===========================================================
+
+@dataclass BlackSeaInputs
+- Simple container for the very first Black Sea data products:
+  - a: 2D numpy array (single channel) extracted from BlSa0.bmp (blue channel), corresponds to MATLAB `a = b;`.
+  - A: 2D numpy array (single channel) extracted from BlSa1.bmp (blue channel), corresponds to MATLAB `A = B;`.
+  - a_rgb: 3D numpy array with the full RGB image for BlSa0.bmp.
+  - A_rgb: 3D numpy array with the full RGB image for BlSa1.bmp.
+- This separates the “raw input loading” from any later analysis steps, so you can clearly see what the starting data look like.
+
+_load_rgb_image(path: Path) -> np.ndarray
+- Low-level helper that opens an image using Pillow and converts it to an RGB numpy array with shape (H, W, 3).
+- Used internally by the step-1 loader; not Black-Sea-specific in logic, just a reusable building block.
+
+load_black_sea_inputs(base_dir: Path) -> BlackSeaInputs
+- Implements **only the first part** of m_BlaSea.m (lines 13–21):
+  - Reads BlSa0.bmp and BlSa1.bmp from the given base directory.
+  - Converts each image to an RGB numpy array.
+  - Extracts the blue channel from each to build `a` and `A`, exactly like MATLAB’s `a = b` and `A = B`.
+- Returns a BlackSeaInputs object, which is the clean, explicit “Step 1 result”: the inputs that all later Black Sea computations will use.
+
+demo_shapes(base_dir: Path) -> ((int, int), (int, int))
+- Small exploration helper.
+- Uses load_black_sea_inputs and returns just the shapes of `a` and `A`, so you can quickly inspect that the data loaded correctly (and see if the two images are the same size).
+
+
+PYTHON CODE (Black Sea – step 2: python/black_sea_step2.py)
+===========================================================
+
+@dataclass BlackSeaGeometry
+- Encapsulates the basic geometric parameters used later in the Black Sea analysis:
+  - n: window size, taken from the width of `a` (size(a, 2)).
+  - L: full image width, taken from the width of `A` (size(A, 2)).
+  - Lo: “center index” for A, computed exactly as in MATLAB (L/2+1 for even L, (L-1)/2+1 for odd L).
+  - n0: “center index” for the window size n, computed with the same formula as Lo.
+  - I0, J0: chosen analysis center in A, using the same offsets as MATLAB: I0 = 19 + n0, J0 = 11 + n0.
+- This makes the size and index logic of m_BlaSea.m explicit and inspectable.
+
+_center_index(size: int) -> int
+- Small helper that implements the MATLAB-style center-index formula shared by Lo and n0.
+
+compute_geometry(base_dir: Path) -> BlackSeaGeometry
+- Chains step 1 and step 2:
+  - Loads a and A via load_black_sea_inputs.
+  - Computes n, L, Lo, n0, I0, J0 using the same formulas as m_BlaSea.m.
+- Returns a BlackSeaGeometry object that future steps (gradients, pattern matching, etc.) can consume.
+
+
+PYTHON CODE (Black Sea – step 3: python/black_sea_step3.py)
+===========================================================
+
+@dataclass BlackSeaGradients
+- Holds the “gradient-like” quantities for A in a clear way:
+  - Gx, Gy: global gradients of A along x (columns) and y (rows).
+  - G_mag: global gradient magnitude |Grad(A)| over the whole A image.
+  - gGx, gGy: local n×n window of Gx and Gy around (I0, J0), analogous to ouPCTe applied to a 2-component field.
+  - g_mag: local gradient magnitude |grad| in that window, analogous to absV2e(g).
+
+_compute_global_gradients(A: np.ndarray) -> (Gx, Gy, G_mag)
+- Uses numpy’s gradient operator as a conceptual stand-in for the more complex cgraFIe / grad2 pipeline:
+  - Gy, Gx = np.gradient(A)
+  - G_mag = hypot(Gx, Gy)
+- Gives you the same kind of information (direction and strength of change) but with a simpler, more transparent implementation.
+
+_extract_window(field: np.ndarray, I0: int, J0: int, n: int) -> np.ndarray
+- Numpy implementation of the idea behind ouPCT:
+  - Builds an n×n window around (I0, J0).
+  - Mirrors indices at the borders when the window runs off the edge, just like ouPCT.m.
+- Works on a single scalar field; used separately on Gx and Gy to build the local gradient window.
+
+compute_gradients(base_dir: Path) -> BlackSeaGradients
+- Chains steps 1–3:
+  - Loads a, A (step 1) and the geometry (step 2).
+  - Computes global gradients Gx, Gy, and G_mag for A.
+  - Extracts a local n×n window of the gradients around (I0, J0) using _extract_window, and computes the local magnitude g_mag.
+- Corresponds to the MATLAB block that:
+  - builds G and pA via cgraFIe,
+  - visualizes abs(Grad),
+  - extracts g with ouPCTe,
+  - visualizes abs(grad);
+  but is written in a simplified, fully numpy-based way so each step is easy to inspect.
+
+
+PYTHON CODE (Black Sea – step 4: python/black_sea_step4_pattern.py)
+===================================================================
+
+@dataclass BlackSeaPattern
+- Represents the idealized direction field `diP` from MATLAB:
+  - ax: x-component on an n×n grid
+  - ay: y-component on an n×n grid
+- This is the “template” vortex pattern that later steps compare the real gradient field against.
+
+build_circular_pattern(n, pr, wd, pnd) -> BlackSeaPattern
+- Python translation of CPOLYe(ind=0, ...) / Cir(...) in `CPOLYe.m`.
+- Produces vectors only in the ring \(pr < r < pr+wd\) (in normalized radius units).
+- pnd controls a phase shift \(pp = pnd * (pi/2)\) exactly like MATLAB.
+
+
+PYTHON CODE (Black Sea – step 5: python/black_sea_step5_score.py)
+=================================================================
+
+@dataclass BlackSeaScoreParts
+- Holds the “signal”/“noise” decomposition and the final score:
+  - Pf: component of the gradient aligned with the pattern (signal)
+  - f_Pf: residual component (noise), masked by |pattern|
+  - score: nor(Pf) / nor(f_Pf)
+
+score_against_pattern(pattern, g_x, g_y) -> BlackSeaScoreParts
+- Python translation of the core logic behind `snPfIe.m`, implemented via the same building blocks:
+  - sca (dot product) ~ `scaIe`
+  - Pf / f_Pf decomposition ~ `PPfIe`
+  - normalization ~ `norIe`
+- This is the key “how vortex-like is this local gradient patch?” metric.
+
+
+PYTHON CODE (Black Sea – step 6: python/black_sea_step6_scan.py)
+=================================================================
+
+@dataclass BlackSeaScanResult
+- Holds:
+  - maD: m×m scan of the step-5 score around the center of A
+  - B: L×L embedded map (like MATLAB `inPCT`)
+  - I0, J0: scan center used
+
+run_scan(base_dir, m=37, pr=0.15, wd=0.90, pnd=0.0) -> BlackSeaScanResult
+- Python analogue of the scanning loop in `m_BlaSea.m` (lines ~63–82):
+  - Builds the pattern diP (step 4)
+  - Computes global gradients (step 3 building blocks)
+  - For each offset in an m×m grid around the image center Lo:
+    - Extracts a local gradient window (ouPCT analogue)
+    - Computes the score (step 5)
+    - Stores it in maD
+  - Embeds maD into an L×L field B, initialized to min(maD), like MATLAB.
+
+
+PYTHON CODE (Visualisation helper: python/black_sea_visualize.py)
+=================================================================
+
+black_sea_visualize.py
+- Not a MATLAB translation step; it’s a convenience script to *see* what steps 3–6 produce.
+- Plots:
+  - global |Grad(A)|
+  - local |grad|
+  - pattern diP as a quiver field
+  - maD scan
+  - embedded B
+
+
